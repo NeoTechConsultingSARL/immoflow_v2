@@ -44,7 +44,7 @@ class BlocController extends Controller
                     'trancheName' => $bloc->tranche->name ?? 'N/A',
                     'projectId' => (string) ($bloc->tranche->project_id ?? ''),
                     'projectName' => $bloc->tranche->project->name ?? 'N/A',
-                    'unitsCount' => 0, // Placeholder, update later if units are added
+                    'unitsCount' => (int) $bloc->units,
                 ];
             });
 
