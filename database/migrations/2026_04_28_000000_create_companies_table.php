@@ -11,13 +11,20 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('companies', function (Blueprint $table) {
+        Schema::create('companies', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+            $table->string('status')->default('active');
             $table->text('description')->nullable();
             $table->string('address')->nullable();
             $table->string('phone')->nullable();
             $table->string('email')->nullable();
             $table->string('website')->nullable();
             $table->string('logo')->nullable();
+            $table->timestamps();
+            
+            // Note: Per corporate security policy for core entities, 
+            // soft deletes are intentionally excluded.
         });
     }
 
@@ -26,8 +33,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('companies', function (Blueprint $table) {
-            $table->dropColumn(['description', 'address', 'phone', 'email', 'website', 'logo']);
-        });
+        Schema::dropIfExists('companies');
     }
 };
