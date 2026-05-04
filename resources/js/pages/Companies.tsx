@@ -1,4 +1,4 @@
-import { router } from "@inertiajs/react";
+import { router, useForm } from "@inertiajs/react";
 import { useState } from "react";
 import { Building2, Plus, Pencil, Trash2, MapPin, Phone, Mail, Globe } from "lucide-react";
 import { AppBreadcrumb } from "@/components/AppBreadcrumb";
@@ -14,25 +14,17 @@ import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 
 interface Company {
-  id: string;
+  id: number;
   name: string;
-  address: string;
-  phone: string;
-  email: string;
-  website: string;
-  description: string;
-  logo: string;
-  properties: number;
+  status: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  website?: string;
+  description?: string;
+  logo?: string;
+  properties?: number;
 }
-
-const initialCompanies: Company[] = [
-  { id: "1", name: "Keller Immobilien GmbH", address: "Maximilianstraße 35, Munich 80539", phone: "+49 89 123 456", email: "info@keller-immo.de", website: "keller-immo.de", description: "Premium residential and commercial property management across Bavaria.", logo: "KI", properties: 48 },
-  { id: "2", name: "BerlinWohnen AG", address: "Friedrichstraße 100, Berlin 10117", phone: "+49 30 987 654", email: "contact@berlinwohnen.de", website: "berlinwohnen.de", description: "Specialist in Berlin residential real estate with a focus on modern living.", logo: "BW", properties: 32 },
-  { id: "3", name: "Hanseatische Hausverwaltung", address: "Jungfernstieg 22, Hamburg 20354", phone: "+49 40 555 123", email: "info@hh-hausverwaltung.de", website: "hh-hausverwaltung.de", description: "Full-service property management for the Hamburg metropolitan area.", logo: "HH", properties: 27 },
-  { id: "4", name: "Rhein-Main Properties", address: "Kaiserstraße 60, Frankfurt 60311", phone: "+49 69 444 789", email: "hello@rheinmain-prop.de", website: "rheinmain-prop.de", description: "Commercial and mixed-use property management in the Rhine-Main region.", logo: "RM", properties: 17 },
-];
-
-const emptyForm: Omit<Company, "id"> = { name: "", address: "", phone: "", email: "", website: "", description: "", logo: "", properties: 0 };
 
 const logoColors = [
   "bg-blue-500/10 text-blue-600",
@@ -43,24 +35,45 @@ const logoColors = [
   "bg-cyan-500/10 text-cyan-600",
 ];
 
-const Companies = () => {
-  const [companies, setCompanies] = useState<Company[]>(initialCompanies);
-  
+const Companies = ({ companies }: { companies: Company[] }) => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editing, setEditing] = useState<Company | null>(null);
   const [deleting, setDeleting] = useState<Company | null>(null);
-  const [form, setForm] = useState(emptyForm);
+
+  const { data: form, setData: setForm, post, put, delete: destroy, reset, clearErrors } = useForm({
+    name: "",
+    address: "",
+    phone: "",
+    email: "",
+    website: "",
+    description: "",
+    logo: "",
+    properties: 0,
+    status: "active"
+  });
 
   const openCreate = () => {
     setEditing(null);
-    setForm(emptyForm);
+    reset();
+    clearErrors();
     setDialogOpen(true);
   };
 
   const openEdit = (company: Company) => {
     setEditing(company);
-    setForm({ name: company.name, address: company.address, phone: company.phone, email: company.email, website: company.website, description: company.description, logo: company.logo, properties: company.properties });
+    setForm({
+      name: company.name,
+      address: company.address || "",
+      phone: company.phone || "",
+      email: company.email || "",
+      website: company.website || "",
+      description: company.description || "",
+      logo: company.logo || "",
+      properties: company.properties || 0,
+      status: company.status || "active"
+    });
+    clearErrors();
     setDialogOpen(true);
   };
 
@@ -74,27 +87,36 @@ const Companies = () => {
       toast({ title: "Company name is required", variant: "destructive" });
       return;
     }
-    const logo = form.logo || form.name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
     if (editing) {
-      setCompanies(prev => prev.map(c => c.id === editing.id ? { ...c, ...form, logo } : c));
-      toast({ title: "Company updated" });
+      put(route('companies.update', editing.id), {
+        onSuccess: () => {
+          setDialogOpen(false);
+          toast({ title: "Company updated" });
+        }
+      });
     } else {
-      setCompanies(prev => [...prev, { ...form, logo, id: crypto.randomUUID() }]);
-      toast({ title: "Company created" });
+      post(route('companies.store'), {
+        onSuccess: () => {
+          setDialogOpen(false);
+          toast({ title: "Company created" });
+        }
+      });
     }
-    setDialogOpen(false);
   };
 
   const handleDelete = () => {
     if (deleting) {
-      setCompanies(prev => prev.filter(c => c.id !== deleting.id));
-      toast({ title: "Company deleted" });
+      destroy(route('companies.destroy', deleting.id), {
+        onSuccess: () => {
+          setDeleteOpen(false);
+          setDeleting(null);
+          toast({ title: "Company deleted" });
+        }
+      });
     }
-    setDeleteOpen(false);
-    setDeleting(null);
   };
 
-  const updateField = (field: keyof typeof form, value: string | number) => setForm(prev => ({ ...prev, [field]: value }));
+  const updateField = (field: keyof typeof form, value: string | number) => setForm(field, value as never);
 
   return (
     <SidebarProvider>
@@ -131,7 +153,7 @@ const Companies = () => {
                   <div className="p-6">
                     <div className="flex items-start gap-4 mb-4">
                       <div className={cn("w-14 h-14 rounded-xl flex items-center justify-center text-lg font-bold shrink-0", logoColors[idx % logoColors.length])}>
-                        {company.logo}
+                        {company.logo || company.name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()}
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-display text-lg font-bold truncate">{company.name}</h3>
@@ -238,7 +260,7 @@ const Companies = () => {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="properties">Properties</Label>
-                <Input id="properties" type="number" value={form.properties} onChange={e => updateField("properties", parseInt(e.target.value) || 0)} />
+                <Input id="properties" type="number" value={form.properties} disabled onChange={e => updateField("properties", parseInt(e.target.value) || 0)} />
               </div>
             </div>
           </div>

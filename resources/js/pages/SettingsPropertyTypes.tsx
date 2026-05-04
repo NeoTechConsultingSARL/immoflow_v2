@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Plus, Pencil, Trash2, Building2, Home, Landmark, Store, Briefcase, LayoutGrid, Warehouse, Hotel, Factory, TreePine, Castle, Tent, School, Church, Hospital, LucideIcon } from "lucide-react";
+import { useForm } from "@inertiajs/react";
 import { AppBreadcrumb } from "@/components/AppBreadcrumb";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/dashboard/AppSidebar";
@@ -31,43 +32,40 @@ const iconOptions: { name: string; icon: LucideIcon }[] = [
   { name: "Hospital", icon: Hospital },
 ];
 
-interface PropertyType {
-  key: string;
-  label: string;
-  iconName: string;
-  icon: LucideIcon;
-  description: string;
+export interface PropertyType {
+  id: number;
+  name: string;
+  icon: string;
+  description: string | null;
 }
 
-const defaultTypes: PropertyType[] = [
-  { key: "Apartment", label: "Apartments", iconName: "Building", icon: Building2, description: "Residential apartments and flats" },
-  { key: "Villa", label: "Villas", iconName: "Home", icon: Home, description: "Luxury standalone houses" },
-  { key: "Land", label: "Land", iconName: "Landmark", icon: Landmark, description: "Plots and parcels of land" },
-  { key: "Duplex", label: "Duplexes", iconName: "Layout", icon: LayoutGrid, description: "Multi-level residential units" },
-  { key: "Store", label: "Stores", iconName: "Store", icon: Store, description: "Commercial retail spaces" },
-  { key: "Office", label: "Offices", iconName: "Briefcase", icon: Briefcase, description: "Professional office spaces" },
-  { key: "Penthouse", label: "Penthouses", iconName: "Warehouse", icon: Warehouse, description: "Top-floor luxury apartments" },
-  { key: "Studio", label: "Studios", iconName: "Home", icon: Home, description: "Compact single-room units" },
-];
-
-const SettingsPropertyTypes = () => {
-  
-  const [types, setTypes] = useState<PropertyType[]>(defaultTypes);
+const SettingsPropertyTypes = ({ propertyTypes = [] }: { propertyTypes: PropertyType[] }) => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<PropertyType | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState<PropertyType | null>(null);
-  const [form, setForm] = useState({ name: "", description: "", iconName: "Building" });
+
+  const { data, setData, post, put, delete: destroy, processing, errors, reset, clearErrors } = useForm({
+    name: "",
+    description: "",
+    icon: "Building"
+  });
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ name: "", description: "", iconName: "Building" });
+    reset();
+    clearErrors();
     setDialogOpen(true);
   };
 
   const openEdit = (type: PropertyType) => {
     setEditing(type);
-    setForm({ name: type.label, description: type.description, iconName: type.iconName });
+    setData({
+      name: type.name,
+      description: type.description || "",
+      icon: type.icon || "Building"
+    });
+    clearErrors();
     setDialogOpen(true);
   };
 
@@ -77,38 +75,36 @@ const SettingsPropertyTypes = () => {
   };
 
   const handleSave = () => {
-    if (!form.name.trim()) {
-      toast({ title: "Name is required", variant: "destructive" });
-      return;
-    }
-    const iconOption = iconOptions.find(i => i.name === form.iconName) || iconOptions[0];
     if (editing) {
-      setTypes(prev => prev.map(t => t.key === editing.key ? { ...t, label: form.name.trim(), description: form.description.trim(), iconName: form.iconName, icon: iconOption.icon } : t));
-      toast({ title: "Property type updated" });
+      put(route('settings.property-types.update', editing.id), {
+        onSuccess: () => {
+          setDialogOpen(false);
+          toast({ title: "Property type updated successfully." });
+        },
+      });
     } else {
-      const newType: PropertyType = {
-        key: form.name.trim(),
-        label: form.name.trim(),
-        iconName: form.iconName,
-        icon: iconOption.icon,
-        description: form.description.trim(),
-      };
-      setTypes(prev => [...prev, newType]);
-      toast({ title: "Property type created" });
+      post(route('settings.property-types.store'), {
+        onSuccess: () => {
+          setDialogOpen(false);
+          toast({ title: "Property type created successfully." });
+        },
+      });
     }
-    setDialogOpen(false);
   };
 
   const handleDelete = () => {
     if (deleting) {
-      setTypes(prev => prev.filter(t => t.key !== deleting.key));
-      toast({ title: "Property type deleted" });
+      destroy(route('settings.property-types.destroy', deleting.id), {
+        onSuccess: () => {
+          setDeleteOpen(false);
+          setDeleting(null);
+          toast({ title: "Property type deleted successfully." });
+        },
+      });
     }
-    setDeleteOpen(false);
-    setDeleting(null);
   };
 
-  const selectedIcon = iconOptions.find(i => i.name === form.iconName)?.icon;
+  const selectedIcon = iconOptions.find(i => i.name === data.icon)?.icon;
 
   return (
     <SidebarProvider>
@@ -142,16 +138,17 @@ const SettingsPropertyTypes = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {types.map((type) => {
-                    const Icon = type.icon;
+                  {propertyTypes.map((type) => {
+                    const IconOption = iconOptions.find(i => i.name === type.icon);
+                    const Icon = IconOption ? IconOption.icon : Building2;
                     return (
-                      <TableRow key={type.key}>
+                      <TableRow key={type.id}>
                         <TableCell>
                           <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
                             <Icon className="w-4 h-4 text-muted-foreground" />
                           </div>
                         </TableCell>
-                        <TableCell className="font-medium">{type.label}</TableCell>
+                        <TableCell className="font-medium">{type.name}</TableCell>
                         <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">{type.description}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
@@ -166,7 +163,7 @@ const SettingsPropertyTypes = () => {
                       </TableRow>
                     );
                   })}
-                  {types.length === 0 && (
+                  {propertyTypes.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
                         No property types yet. Click "New Property Type" to add one.
@@ -188,15 +185,17 @@ const SettingsPropertyTypes = () => {
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="st-name">Name *</Label>
-              <Input id="st-name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Townhouse" />
+              <Input id="st-name" value={data.name} onChange={e => setData('name', e.target.value)} placeholder="e.g. Townhouse" />
+              {errors.name && <div className="text-sm text-destructive">{errors.name}</div>}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="st-desc">Description</Label>
-              <Textarea id="st-desc" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Brief description" rows={3} />
+              <Textarea id="st-desc" value={data.description} onChange={e => setData('description', e.target.value)} placeholder="Brief description" rows={3} />
+              {errors.description && <div className="text-sm text-destructive">{errors.description}</div>}
             </div>
             <div className="grid gap-2">
               <Label>Icon</Label>
-              <Select value={form.iconName} onValueChange={v => setForm(f => ({ ...f, iconName: v }))}>
+              <Select value={data.icon} onValueChange={v => setData('icon', v)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -211,6 +210,7 @@ const SettingsPropertyTypes = () => {
                   })}
                 </SelectContent>
               </Select>
+              {errors.icon && <div className="text-sm text-destructive">{errors.icon}</div>}
               {selectedIcon && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                   <span>Preview:</span>
@@ -223,7 +223,7 @@ const SettingsPropertyTypes = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave} style={{ background: "hsl(var(--accent))", color: "hsl(var(--accent-foreground))" }}>
+            <Button onClick={handleSave} disabled={processing} style={{ background: "hsl(var(--accent))", color: "hsl(var(--accent-foreground))" }}>
               {editing ? "Save Changes" : "Create Type"}
             </Button>
           </DialogFooter>
@@ -233,12 +233,12 @@ const SettingsPropertyTypes = () => {
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete {deleting?.label}?</AlertDialogTitle>
+            <AlertDialogTitle>Delete {deleting?.name}?</AlertDialogTitle>
             <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+            <AlertDialogAction onClick={handleDelete} disabled={processing} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -1,0 +1,24 @@
+@startuml
+left to right direction
+actor "Admin" as admin
+actor "Manager" as manager
+actor "User" as user
+
+package "Authentication System" {
+  usecase "Login" as UC1
+  usecase "Logout" as UC2
+  usecase "Reset Password" as UC3
+}
+
+user --> UC1
+user --> UC2
+user --> UC3
+
+manager --> UC1
+manager --> UC2
+manager --> UC3
+
+admin --> UC1
+admin --> UC2
+admin --> UC3
+@enduml

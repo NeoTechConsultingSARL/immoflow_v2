@@ -66,32 +66,48 @@ interface PropertyType {
   color: string;
   iconColor: string;
   borderColor: string;
+  count?: number;
 }
 
 const defaultTypes: PropertyType[] = [
-  { key: "Apartment", label: "Apartments", iconName: "Building", icon: Building2, description: "Residential apartments and flats", color: gradientColors[0], iconColor: iconColors[0], borderColor: "hover:border-blue-500/30" },
-  { key: "Villa", label: "Villas", iconName: "Home", icon: Home, description: "Luxury standalone houses", color: gradientColors[1], iconColor: iconColors[1], borderColor: "hover:border-emerald-500/30" },
-  { key: "Land", label: "Land", iconName: "Landmark", icon: Landmark, description: "Plots and parcels of land", color: gradientColors[2], iconColor: iconColors[2], borderColor: "hover:border-amber-500/30" },
-  { key: "Duplex", label: "Duplexes", iconName: "Layout", icon: LayoutGrid, description: "Multi-level residential units", color: gradientColors[3], iconColor: iconColors[3], borderColor: "hover:border-violet-500/30" },
-  { key: "Store", label: "Stores", iconName: "Store", icon: Store, description: "Commercial retail spaces", color: gradientColors[4], iconColor: iconColors[4], borderColor: "hover:border-rose-500/30" },
-  { key: "Office", label: "Offices", iconName: "Briefcase", icon: Briefcase, description: "Professional office spaces", color: gradientColors[5], iconColor: iconColors[5], borderColor: "hover:border-cyan-500/30" },
-  { key: "Penthouse", label: "Penthouses", iconName: "Warehouse", icon: Warehouse, description: "Top-floor luxury apartments", color: gradientColors[6], iconColor: iconColors[6], borderColor: "hover:border-indigo-500/30" },
-  { key: "Studio", label: "Studios", iconName: "Home", icon: Home, description: "Compact single-room units", color: gradientColors[7], iconColor: iconColors[7], borderColor: "hover:border-teal-500/30" },
+  { key: "Apartment", label: "Apartments", iconName: "Building", icon: Building2, description: "Residential apartments and flats", color: gradientColors[0], iconColor: iconColors[0], borderColor: "hover:border-blue-500/30", count: 0 },
+  { key: "Villa", label: "Villas", iconName: "Home", icon: Home, description: "Luxury standalone houses", color: gradientColors[1], iconColor: iconColors[1], borderColor: "hover:border-emerald-500/30", count: 0 },
+  { key: "Land", label: "Land", iconName: "Landmark", icon: Landmark, description: "Plots and parcels of land", color: gradientColors[2], iconColor: iconColors[2], borderColor: "hover:border-amber-500/30", count: 0 },
+  { key: "Duplex", label: "Duplexes", iconName: "Layout", icon: LayoutGrid, description: "Multi-level residential units", color: gradientColors[3], iconColor: iconColors[3], borderColor: "hover:border-violet-500/30", count: 0 },
+  { key: "Store", label: "Stores", iconName: "Store", icon: Store, description: "Commercial retail spaces", color: gradientColors[4], iconColor: iconColors[4], borderColor: "hover:border-rose-500/30", count: 0 },
+  { key: "Office", label: "Offices", iconName: "Briefcase", icon: Briefcase, description: "Professional office spaces", color: gradientColors[5], iconColor: iconColors[5], borderColor: "hover:border-cyan-500/30", count: 0 },
+  { key: "Penthouse", label: "Penthouses", iconName: "Warehouse", icon: Warehouse, description: "Top-floor luxury apartments", color: gradientColors[6], iconColor: iconColors[6], borderColor: "hover:border-indigo-500/30", count: 0 },
+  { key: "Studio", label: "Studios", iconName: "Home", icon: Home, description: "Compact single-room units", color: gradientColors[7], iconColor: iconColors[7], borderColor: "hover:border-teal-500/30", count: 0 },
 ];
 
-const PropertyTypes = () => {
-  const searchParams = new URLSearchParams(window.location.search);
-  
-  const filterProject = searchParams.get("project");
-  const projectName = searchParams.get("name") || "";
-  const companyId = searchParams.get("company") || "";
-  const companyName = searchParams.get("companyName") || "";
-  const trancheId = searchParams.get("tranche") || "";
-  const trancheName = searchParams.get("trancheName") || "";
-  const blocId = searchParams.get("bloc") || "";
-  const blocName = searchParams.get("blocName") || "";
+interface PropertyTypesProps {
+  bloc?: any;
+  tranche?: any;
+  project?: any;
+  company?: any;
+  types?: any[];
+}
 
-  const [types, setTypes] = useState<PropertyType[]>(defaultTypes);
+const PropertyTypes = ({ bloc, tranche, project, company, types: dbTypes = [] }: PropertyTypesProps) => {
+  // If no dbTypes are provided (e.g. static preview), fallback to defaultTypes
+  // Otherwise map the DB types to visual tiles
+  const mappedTypes: PropertyType[] = dbTypes.length > 0 ? dbTypes.map((t, index) => {
+    const iconOption = iconOptions.find(i => i.name === t.icon) || iconOptions[0];
+    const colorIndex = index % gradientColors.length;
+    return {
+      key: t.id.toString(),
+      label: t.name,
+      iconName: t.icon,
+      icon: iconOption.icon,
+      description: t.description || "",
+      color: gradientColors[colorIndex],
+      iconColor: iconColors[colorIndex],
+      borderColor: "hover:border-muted-foreground/30",
+      count: t.properties_count,
+    };
+  }) : defaultTypes;
+
+  const [types, setTypes] = useState<PropertyType[]>(mappedTypes);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<PropertyType | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -99,17 +115,11 @@ const PropertyTypes = () => {
   const [form, setForm] = useState({ name: "", description: "", iconName: "Building" });
 
   const handleTypeClick = (typeKey: string) => {
-    const params = new URLSearchParams();
-    if (filterProject) params.set("project", filterProject);
-    if (projectName) params.set("name", projectName);
-    if (companyId) params.set("company", companyId);
-    if (companyName) params.set("companyName", companyName);
-    if (trancheId) params.set("tranche", trancheId);
-    if (trancheName) params.set("trancheName", trancheName);
-    if (blocId) params.set("bloc", blocId);
-    if (blocName) params.set("blocName", blocName);
-    params.set("type", typeKey);
-    router.visit(`/properties?${params.toString()}`);
+    if (bloc) {
+      router.visit(`/blocs/${bloc.id}/property-types/${typeKey}/properties`);
+    } else {
+      router.visit(`/properties?type=${typeKey}`);
+    }
   };
 
   const openCreate = () => {
@@ -136,6 +146,8 @@ const PropertyTypes = () => {
       toast({ title: "Name is required", variant: "destructive" });
       return;
     }
+    // In a full implementation, this would send an Inertia POST/PUT request.
+    // For now, we mimic the UI update.
     const iconOption = iconOptions.find(i => i.name === form.iconName) || iconOptions[0];
     if (editing) {
       setTypes(prev => prev.map(t => t.key === editing.key ? { ...t, label: form.name.trim(), description: form.description.trim(), iconName: form.iconName, icon: iconOption.icon } : t));
@@ -160,6 +172,7 @@ const PropertyTypes = () => {
 
   const handleDelete = () => {
     if (deleting) {
+      // In a full implementation, this would send an Inertia DELETE request.
       setTypes(prev => prev.filter(t => t.key !== deleting.key));
       toast({ title: "Property type deleted" });
     }
@@ -169,6 +182,23 @@ const PropertyTypes = () => {
 
   const selectedIcon = iconOptions.find(i => i.name === form.iconName)?.icon;
 
+  let breadcrumbItems: any[] = [];
+  if (bloc && tranche && project && company) {
+    breadcrumbItems = [
+      { title: "Companies", url: "/companies" },
+      { title: company.name, url: `/projects?company=${company.id}&companyName=${encodeURIComponent(company.name)}` },
+      { title: project.name, url: route('projects.tranches.index', project.id) },
+      { title: tranche.name, url: route('projects.tranches.blocs.index', { project: project.id, tranche: tranche.id }) },
+      { title: bloc.name, url: route('blocs.management', bloc.id) },
+      { title: "Property Types", url: "" }
+    ];
+  } else {
+    breadcrumbItems = [
+      { title: "Settings", url: "/settings" },
+      { title: "Property Types", url: "" }
+    ];
+  }
+
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
@@ -177,17 +207,19 @@ const PropertyTypes = () => {
           <header className="h-16 bg-card border-b border-border flex items-center justify-between px-6 sticky top-0 z-40">
             <div className="flex items-center gap-4">
               <SidebarTrigger className="lg:hidden" />
-              <AppBreadcrumb />
+              <AppBreadcrumb customItems={breadcrumbItems} />
             </div>
-            <Button onClick={openCreate} className="gap-2" style={{ background: "hsl(var(--accent))", color: "hsl(var(--accent-foreground))" }}>
-              <Plus className="w-4 h-4" /> New Property Type
-            </Button>
+            {!bloc && (
+              <Button onClick={openCreate} className="gap-2" style={{ background: "hsl(var(--accent))", color: "hsl(var(--accent-foreground))" }}>
+                <Plus className="w-4 h-4" /> New Property Type
+              </Button>
+            )}
           </header>
 
           <main className="flex-1 p-6 lg:p-8 max-w-[1400px] animate-in fade-in slide-in-from-bottom-1 duration-400">
             <div className="mb-8">
               <h2 className="font-display text-[1.75rem] xl:text-[2rem] font-bold">
-                {projectName ? decodeURIComponent(projectName) : "Property Types"}
+                {project ? project.name : "Property Types"}
               </h2>
               <p className="text-[0.9375rem] text-muted-foreground">Select a property type to browse listings.</p>
             </div>
@@ -198,28 +230,38 @@ const PropertyTypes = () => {
                 return (
                   <div
                     key={type.key}
-                    className={`group bg-gradient-to-br ${type.color} border border-border ${type.borderColor} rounded-xl p-6 text-left transition-all duration-300 hover:shadow-[var(--shadow-elevated)] hover:-translate-y-0.5`}
+                    className={`group bg-gradient-to-br ${type.color} border border-border ${type.borderColor} rounded-xl p-6 text-left transition-all duration-300 hover:shadow-[var(--shadow-elevated)] hover:-translate-y-0.5 cursor-pointer`}
+                    onClick={() => handleTypeClick(type.key)}
                   >
                     <div className="flex items-start justify-between mb-4">
                       <div className="w-12 h-12 rounded-lg bg-background/80 flex items-center justify-center shadow-sm">
                         <Icon className={`w-6 h-6 ${type.iconColor}`} />
                       </div>
                       <div className="flex items-center gap-1">
+                        {type.count !== undefined && bloc && (
+                          <span className="text-xs font-semibold px-2 py-1 rounded-md bg-background/50 text-muted-foreground mr-1">
+                            {type.count} {type.count === 1 ? 'unit' : 'units'}
+                          </span>
+                        )}
                         <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={(e) => { e.stopPropagation(); handleTypeClick(type.key); }}>
                           <Eye className="w-3.5 h-3.5" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={(e) => openEdit(type, e)}>
-                          <Pencil className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={(e) => openDelete(type, e)}>
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
+                        {!bloc && (
+                          <>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={(e) => openEdit(type, e)}>
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={(e) => openDelete(type, e)}>
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </div>
-                    <button onClick={() => handleTypeClick(type.key)} className="text-left w-full">
+                    <div className="text-left w-full">
                       <h3 className="font-display text-lg font-bold mb-1">{type.label}</h3>
                       <p className="text-sm text-muted-foreground">{type.description}</p>
-                    </button>
+                    </div>
                   </div>
                 );
               })}

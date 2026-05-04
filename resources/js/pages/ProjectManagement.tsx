@@ -18,25 +18,28 @@ const tiles = [
   { id: "documents", label: "Project Documents", description: "Store and manage project files and documents", icon: FileText, bg: "bg-card", hoverBg: "hover:bg-gradient-to-br hover:from-indigo-500/80 hover:to-indigo-700/80", iconColor: "text-indigo-600", hoverIconColor: "group-hover:text-white", textColor: "text-foreground", hoverTextColor: "group-hover:text-white/90", subTextColor: "text-muted-foreground", hoverSubTextColor: "group-hover:text-white/60", iconWrapBg: "bg-indigo-500/10", hoverIconWrapBg: "group-hover:bg-white/10" },
 ];
 
-const ProjectManagement = () => {
-  const searchParams = new URLSearchParams(window.location.search);
-  
-  const projectId = searchParams.get("project") || "";
-  const projectName = searchParams.get("name") || "Project";
-  const companyId = searchParams.get("company") || "";
-  const companyName = searchParams.get("companyName") || "";
-  const trancheId = searchParams.get("tranche") || "";
-  const trancheName = searchParams.get("trancheName") || "";
-  const blocId = searchParams.get("bloc") || "";
-  const blocName = searchParams.get("blocName") || "";
+interface ProjectManagementProps {
+  bloc: any;
+  tranche: any;
+  project: any;
+  company: any;
+}
 
-  const companyQuery = companyId ? `&company=${companyId}&companyName=${encodeURIComponent(companyName)}` : "";
-  const trancheQuery = trancheId ? `&tranche=${trancheId}&trancheName=${encodeURIComponent(trancheName)}` : "";
-  const blocQuery = blocId ? `&bloc=${blocId}&blocName=${encodeURIComponent(blocName)}` : "";
+const ProjectManagement = ({ bloc, tranche, project, company }: ProjectManagementProps) => {
+  const breadcrumbItems = [
+    { title: "Companies", url: "/companies" },
+    { title: company.name, url: `/projects?company=${company.id}&companyName=${encodeURIComponent(company.name)}` },
+    { title: project.name, url: route('projects.tranches.index', project.id) },
+    { title: tranche.name, url: route('projects.tranches.blocs.index', { project: project.id, tranche: tranche.id }) },
+    { title: bloc.name, url: "" },
+    { title: "Project Management", url: "" }
+  ];
 
   const handleTileClick = (tileId: string) => {
     if (tileId === "properties") {
-      router.visit(`/property-types?project=${projectId}&name=${encodeURIComponent(projectName)}${companyQuery}${trancheQuery}${blocQuery}`);
+      router.visit(route('blocs.property-types', bloc.id));
+    } else if (tileId === "parking") {
+      router.visit(route('blocs.parkings.index', bloc.id));
     }
     // Other tiles can be wired up later
   };
@@ -49,13 +52,13 @@ const ProjectManagement = () => {
           <header className="h-16 bg-card border-b border-border flex items-center justify-between px-6 sticky top-0 z-40">
             <div className="flex items-center gap-4">
               <SidebarTrigger className="lg:hidden" />
-              <AppBreadcrumb />
+              <AppBreadcrumb customItems={breadcrumbItems} />
             </div>
           </header>
 
           <main className="flex-1 p-6 lg:p-8 max-w-[1400px] animate-in fade-in slide-in-from-bottom-1 duration-400">
             <div className="mb-8">
-              <h2 className="font-display text-[1.75rem] xl:text-[2rem] font-bold">{decodeURIComponent(projectName)}</h2>
+              <h2 className="font-display text-[1.75rem] xl:text-[2rem] font-bold">{project.name}</h2>
               <p className="text-[0.9375rem] text-muted-foreground">Select a management area below.</p>
             </div>
 

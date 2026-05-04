@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { router } from "@inertiajs/react";
+import { router, useForm } from "@inertiajs/react";
 import { Layers, Plus, Pencil, Trash2, ChevronRight } from "lucide-react";
 import { AppBreadcrumb } from "@/components/AppBreadcrumb";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -13,89 +13,89 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { toast } from "@/hooks/use-toast";
 
 interface Tranche {
-  id: string;
+  id: number;
   name: string;
   description: string;
-  blocsCount: number;
-  unitsCount: number;
+  blocs_count: number;
+  properties_sum_quantity: number;
 }
 
-const initialTranches: Record<string, Tranche[]> = {
-  "1": [
-    { id: "t1", name: "Tranche A", description: "First phase — residential wing north", blocsCount: 3, unitsCount: 12 },
-    { id: "t2", name: "Tranche B", description: "Second phase — residential wing south", blocsCount: 2, unitsCount: 8 },
-    { id: "t3", name: "Tranche C", description: "Third phase — commercial ground floor", blocsCount: 1, unitsCount: 4 },
-  ],
-  "2": [
-    { id: "t4", name: "Tranche 1", description: "Loft conversion — building east", blocsCount: 2, unitsCount: 10 },
-    { id: "t5", name: "Tranche 2", description: "Loft conversion — building west", blocsCount: 2, unitsCount: 8 },
-  ],
-  "3": [
-    { id: "t6", name: "Phase Alpha", description: "Waterfront premium apartments", blocsCount: 4, unitsCount: 20 },
-    { id: "t7", name: "Phase Beta", description: "Waterfront standard apartments", blocsCount: 3, unitsCount: 16 },
-  ],
-  "4": [
-    { id: "t8", name: "Tranche Office", description: "Office tower floors 1–10", blocsCount: 2, unitsCount: 20 },
-    { id: "t9", name: "Tranche Residential", description: "Residential tower floors 11–22", blocsCount: 3, unitsCount: 22 },
-  ],
-  "5": [
-    { id: "t10", name: "Tranche Unique", description: "Single-phase boutique project", blocsCount: 2, unitsCount: 12 },
-  ],
-  "6": [
-    { id: "t11", name: "Tranche Nord", description: "North wing studios", blocsCount: 2, unitsCount: 15 },
-    { id: "t12", name: "Tranche Süd", description: "South wing studios", blocsCount: 2, unitsCount: 15 },
-  ],
-};
+interface Project {
+  id: number;
+  name: string;
+  company: {
+    id: number;
+    name: string;
+  };
+}
 
-const emptyForm = { name: "", description: "" };
-
-const Tranches = () => {
-  const searchParams = new URLSearchParams(window.location.search);
-  const projectId = searchParams.get("project") || "";
-  const projectName = searchParams.get("name") || "Project";
-  const companyId = searchParams.get("company") || "";
-  const companyName = searchParams.get("companyName") || "";
-
-  const [tranches, setTranches] = useState<Tranche[]>(initialTranches[projectId] || [
-    { id: "t-default-1", name: "Tranche 1", description: "Default tranche", blocsCount: 2, unitsCount: 10 },
-  ]);
+const Tranches = ({ project, tranches = [] }: { project: Project, tranches: Tranche[] }) => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editing, setEditing] = useState<Tranche | null>(null);
   const [deleting, setDeleting] = useState<Tranche | null>(null);
-  const [form, setForm] = useState(emptyForm);
 
-  const companyQuery = companyId ? `&company=${companyId}&companyName=${encodeURIComponent(companyName)}` : "";
-  const projectQuery = `project=${projectId}&name=${encodeURIComponent(projectName)}`;
+  const { data, setData, post, put, delete: destroy, processing, reset, clearErrors, errors } = useForm({
+    name: "",
+    description: "",
+  });
 
-  const openCreate = () => { setEditing(null); setForm(emptyForm); setDialogOpen(true); };
+  const openCreate = () => {
+    setEditing(null);
+    reset();
+    clearErrors();
+    setDialogOpen(true);
+  };
+
   const openEdit = (t: Tranche, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditing(t);
-    setForm({ name: t.name, description: t.description });
+    setData({
+      name: t.name,
+      description: t.description || "",
+    });
+    clearErrors();
     setDialogOpen(true);
   };
-  const openDelete = (t: Tranche, e: React.MouseEvent) => { e.stopPropagation(); setDeleting(t); setDeleteOpen(true); };
+
+  const openDelete = (t: Tranche, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDeleting(t);
+    setDeleteOpen(true);
+  };
 
   const handleSave = () => {
-    if (!form.name.trim()) { toast({ title: "Name is required", variant: "destructive" }); return; }
     if (editing) {
-      setTranches(prev => prev.map(t => t.id === editing.id ? { ...t, ...form } : t));
-      toast({ title: "Tranche updated" });
+      put(route('projects.tranches.update', { project: project.id, tranche: editing.id }), {
+        onSuccess: () => {
+          setDialogOpen(false);
+          toast({ title: "Tranche updated successfully." });
+        },
+      });
     } else {
-      setTranches(prev => [...prev, { ...form, id: crypto.randomUUID(), blocsCount: 0, unitsCount: 0 }]);
-      toast({ title: "Tranche created" });
+      post(route('projects.tranches.store', project.id), {
+        onSuccess: () => {
+          setDialogOpen(false);
+          toast({ title: "Tranche created successfully." });
+        },
+      });
     }
-    setDialogOpen(false);
   };
 
   const handleDelete = () => {
-    if (deleting) { setTranches(prev => prev.filter(t => t.id !== deleting.id)); toast({ title: "Tranche deleted" }); }
-    setDeleteOpen(false); setDeleting(null);
+    if (deleting) {
+      destroy(route('projects.tranches.destroy', { project: project.id, tranche: deleting.id }), {
+        onSuccess: () => {
+          setDeleteOpen(false);
+          setDeleting(null);
+          toast({ title: "Tranche deleted successfully." });
+        },
+      });
+    }
   };
 
   const handleTrancheClick = (tranche: Tranche) => {
-    router.visit(`/projects/${projectId}/blocs?${projectQuery}${companyQuery}&tranche=${tranche.id}&trancheName=${encodeURIComponent(tranche.name)}`);
+    router.visit(route('projects.tranches.blocs.index', { project: project.id, tranche: tranche.id }));
   };
 
   return (
@@ -106,7 +106,11 @@ const Tranches = () => {
           <header className="h-16 bg-card border-b border-border flex items-center justify-between px-6 sticky top-0 z-40">
             <div className="flex items-center gap-4">
               <SidebarTrigger className="lg:hidden" />
-              <AppBreadcrumb />
+              <AppBreadcrumb customItems={[
+                { title: "Companies", url: "/companies" },
+                { title: project.company?.name || "Company", url: `/projects?company=${project.company?.id || ''}&companyName=${encodeURIComponent(project.company?.name || '')}` },
+                { title: project.name, url: "" }
+              ]} />
             </div>
             <Button onClick={openCreate} className="gap-2" style={{ background: "hsl(var(--accent))", color: "hsl(var(--accent-foreground))" }}>
               <Plus className="w-4 h-4" /> Add Tranche
@@ -115,7 +119,7 @@ const Tranches = () => {
 
           <main className="flex-1 p-6 lg:p-8 max-w-[1400px] animate-in fade-in slide-in-from-bottom-1 duration-400">
             <div className="mb-8">
-              <h2 className="font-display text-[1.75rem] xl:text-[2rem] font-bold">{decodeURIComponent(projectName)} — Tranches</h2>
+              <h2 className="font-display text-[1.75rem] xl:text-[2rem] font-bold">{project.name} — Tranches</h2>
               <p className="text-[0.9375rem] text-muted-foreground">Manage project tranches. Click a tranche to view its blocs.</p>
             </div>
 
@@ -144,9 +148,9 @@ const Tranches = () => {
                     <h3 className="font-display text-lg font-bold leading-tight mb-1">{tranche.name}</h3>
                     <p className="text-sm text-muted-foreground line-clamp-2 mb-4">{tranche.description}</p>
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span className="font-semibold text-foreground">{tranche.blocsCount} blocs</span>
+                      <span className="font-semibold text-foreground">{tranche.blocs_count || 0} blocs</span>
                       <span>·</span>
-                      <span>{tranche.unitsCount} units</span>
+                      <span>{tranche.properties_sum_quantity || 0} units</span>
                     </div>
                   </div>
                   <div className="relative px-6 py-3 border-t border-border bg-muted/30 group-hover:bg-primary/10 flex items-center justify-between text-sm text-muted-foreground group-hover:text-foreground transition-colors duration-300 overflow-hidden">
@@ -190,16 +194,20 @@ const Tranches = () => {
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="tranche-name">Tranche Name *</Label>
-              <Input id="tranche-name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Tranche A" />
+              <Input id="tranche-name" value={data.name} onChange={e => setData("name", e.target.value)} placeholder="e.g. Tranche A" />
+              {errors.name && <div className="text-sm text-destructive">{errors.name}</div>}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="tranche-desc">Description</Label>
-              <Textarea id="tranche-desc" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Brief description" rows={3} />
+              <Textarea id="tranche-desc" value={data.description} onChange={e => setData("description", e.target.value)} placeholder="Brief description" rows={3} />
+              {errors.description && <div className="text-sm text-destructive">{errors.description}</div>}
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave} style={{ background: "hsl(var(--accent))", color: "hsl(var(--accent-foreground))" }}>{editing ? "Save Changes" : "Create Tranche"}</Button>
+            <Button onClick={handleSave} disabled={processing} style={{ background: "hsl(var(--accent))", color: "hsl(var(--accent-foreground))" }}>
+              {editing ? "Save Changes" : "Create Tranche"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -212,7 +220,7 @@ const Tranches = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+            <AlertDialogAction onClick={handleDelete} disabled={processing} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -1,6 +1,13 @@
 <?php
 
+use App\Http\Controllers\BlocController;
+use App\Http\Controllers\CompanyController;
+use App\Http\Controllers\ParkingController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\PropertyController;
+use App\Http\Controllers\PropertyTypeController;
+use App\Http\Controllers\TrancheController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -15,37 +22,49 @@ Route::middleware('auth')->group(function () {
         return Inertia::render('Dashboard');
     })->name('dashboard');
 
-    Route::get('/companies', function () {
-        return Inertia::render('Companies');
-    })->name('companies')->middleware('role:admin,manager');
+    Route::resource('companies', CompanyController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->middleware('role:admin,manager');
 
-    Route::get('/projects', function () {
-        return Inertia::render('Projects');
-    })->name('projects')->middleware('role:admin,manager');
+    Route::resource('projects', ProjectController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->middleware('role:admin,manager');
 
     Route::get('/project-management', function () {
         return Inertia::render('ProjectManagement');
     })->name('project-management')->middleware('role:admin,manager');
 
-    Route::get('/management/{project}', function () {
-        return Inertia::render('ProjectManagement');
-    })->name('management')->middleware('role:admin,manager');
+    Route::get('/blocs/{bloc}/management', [PropertyController::class, 'managementGateway'])
+        ->name('blocs.management')->middleware('role:admin,manager');
 
-    Route::get('/tranches', function () {
-        return Inertia::render('Tranches');
-    })->name('tranches')->middleware('role:admin,manager');
+    Route::resource('projects.tranches', TrancheController::class)
+        ->parameters(['tranches' => 'tranche'])
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->middleware('role:admin,manager');
 
-    Route::get('/projects/{project}/blocs', function () {
-        return Inertia::render('Blocs');
-    })->name('projects.blocs')->middleware('role:admin,manager');
+    Route::resource('projects.tranches.blocs', BlocController::class)
+        ->parameters(['tranches' => 'tranche'])
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->middleware('role:admin,manager');
 
-    Route::get('/blocs', function () {
-        return Inertia::render('Blocs');
-    })->name('blocs')->middleware('role:admin,manager');
+    Route::get('/blocs/{bloc}/property-types', [PropertyController::class, 'propertyTypeGrid'])
+        ->name('blocs.property-types')->middleware('role:admin,manager');
 
-    Route::get('/property-types', function () {
-        return Inertia::render('PropertyTypes');
-    })->name('property-types')->middleware('role:admin,manager');
+    Route::get('/blocs/{bloc}/property-types/{type}/properties', [PropertyController::class, 'propertiesList'])
+        ->name('blocs.properties')->middleware('role:admin,manager');
+
+    Route::post('/blocs/{bloc}/property-types/{type}/properties', [PropertyController::class, 'store'])
+        ->name('blocs.properties.store')->middleware('role:admin,manager');
+
+    Route::put('/blocs/{bloc}/property-types/{type}/properties/{property}', [PropertyController::class, 'update'])
+        ->name('blocs.properties.update')->middleware('role:admin,manager');
+
+    Route::delete('/blocs/{bloc}/property-types/{type}/properties/{property}', [PropertyController::class, 'destroy'])
+        ->name('blocs.properties.destroy')->middleware('role:admin,manager');
+
+    Route::resource('blocs.parkings', ParkingController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->middleware('role:admin,manager');
 
     Route::get('/properties', function () {
         return Inertia::render('Properties');
@@ -55,9 +74,14 @@ Route::middleware('auth')->group(function () {
         return Inertia::render('Settings');
     })->name('settings')->middleware('role:admin');
 
-    Route::get('/settings/property-types', function () {
-        return Inertia::render('SettingsPropertyTypes');
-    })->name('settings.property-types')->middleware('role:admin');
+    Route::get('/settings/property-types', [PropertyTypeController::class, 'index'])
+        ->name('settings.property-types')->middleware('role:admin');
+    Route::post('/settings/property-types', [PropertyTypeController::class, 'store'])
+        ->name('settings.property-types.store')->middleware('role:admin');
+    Route::put('/settings/property-types/{property_type}', [PropertyTypeController::class, 'update'])
+        ->name('settings.property-types.update')->middleware('role:admin');
+    Route::delete('/settings/property-types/{property_type}', [PropertyTypeController::class, 'destroy'])
+        ->name('settings.property-types.destroy')->middleware('role:admin');
 
     Route::get('/settings/users', [UserController::class, 'index'])
         ->name('settings.users')->middleware('role:admin');

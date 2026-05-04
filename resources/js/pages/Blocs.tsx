@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { router } from "@inertiajs/react";
+import { router, useForm } from "@inertiajs/react";
 import { Box, Plus, Pencil, Trash2, ChevronRight } from "lucide-react";
 import { AppBreadcrumb } from "@/components/AppBreadcrumb";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -13,88 +13,96 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { toast } from "@/hooks/use-toast";
 
 interface Bloc {
-  id: string;
+  id: number;
   name: string;
   description: string;
   floors: number;
-  unitsCount: number;
+  properties_count: number;
 }
 
-const initialBlocs: Record<string, Bloc[]> = {
-  "t1": [
-    { id: "b1", name: "Bloc A1", description: "North wing — ground to 4th floor", floors: 5, unitsCount: 4 },
-    { id: "b2", name: "Bloc A2", description: "North wing — 5th to 8th floor", floors: 4, unitsCount: 4 },
-    { id: "b3", name: "Bloc A3", description: "North wing — penthouse level", floors: 2, unitsCount: 4 },
-  ],
-  "t2": [
-    { id: "b4", name: "Bloc B1", description: "South wing — lower section", floors: 4, unitsCount: 4 },
-    { id: "b5", name: "Bloc B2", description: "South wing — upper section", floors: 4, unitsCount: 4 },
-  ],
-  "t3": [
-    { id: "b6", name: "Bloc C1", description: "Commercial ground floor units", floors: 1, unitsCount: 4 },
-  ],
-  "t4": [
-    { id: "b7", name: "East Wing A", description: "Loft units — east building lower", floors: 3, unitsCount: 5 },
-    { id: "b8", name: "East Wing B", description: "Loft units — east building upper", floors: 3, unitsCount: 5 },
-  ],
-  "t5": [
-    { id: "b9", name: "West Wing A", description: "Loft units — west building lower", floors: 3, unitsCount: 4 },
-    { id: "b10", name: "West Wing B", description: "Loft units — west building upper", floors: 3, unitsCount: 4 },
-  ],
-};
+interface Project {
+  id: number;
+  name: string;
+  company: {
+    id: number;
+    name: string;
+  };
+}
 
-const emptyForm = { name: "", description: "", floors: 1 };
+interface Tranche {
+  id: number;
+  name: string;
+}
 
-const Blocs = () => {
-  const searchParams = new URLSearchParams(window.location.search);
-  const projectId = searchParams.get("project") || "";
-  const projectName = searchParams.get("name") || "Project";
-  const companyId = searchParams.get("company") || "";
-  const companyName = searchParams.get("companyName") || "";
-  const trancheId = searchParams.get("tranche") || "";
-  const trancheName = searchParams.get("trancheName") || "Tranche";
-
-  const [blocs, setBlocs] = useState<Bloc[]>(initialBlocs[trancheId] || [
-    { id: "b-default-1", name: "Bloc 1", description: "Default bloc", floors: 3, unitsCount: 6 },
-  ]);
+export default function Blocs({ project, tranche, blocs = [] }: { project: Project, tranche: Tranche, blocs: Bloc[] }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editing, setEditing] = useState<Bloc | null>(null);
   const [deleting, setDeleting] = useState<Bloc | null>(null);
-  const [form, setForm] = useState(emptyForm);
 
-  const companyQuery = companyId ? `&company=${companyId}&companyName=${encodeURIComponent(companyName)}` : "";
-  const projectQuery = `project=${projectId}&name=${encodeURIComponent(projectName)}`;
-  const trancheQuery = `&tranche=${trancheId}&trancheName=${encodeURIComponent(trancheName)}`;
+  const { data, setData, post, put, delete: destroy, processing, reset, clearErrors, errors } = useForm({
+    name: "",
+    description: "",
+    floors: 1,
+  });
 
-  const openCreate = () => { setEditing(null); setForm(emptyForm); setDialogOpen(true); };
+  const openCreate = () => {
+    setEditing(null);
+    reset();
+    clearErrors();
+    setDialogOpen(true);
+  };
+
   const openEdit = (b: Bloc, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditing(b);
-    setForm({ name: b.name, description: b.description, floors: b.floors });
+    setData({
+      name: b.name,
+      description: b.description || "",
+      floors: b.floors || 1,
+    });
+    clearErrors();
     setDialogOpen(true);
   };
-  const openDelete = (b: Bloc, e: React.MouseEvent) => { e.stopPropagation(); setDeleting(b); setDeleteOpen(true); };
+
+  const openDelete = (b: Bloc, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDeleting(b);
+    setDeleteOpen(true);
+  };
 
   const handleSave = () => {
-    if (!form.name.trim()) { toast({ title: "Name is required", variant: "destructive" }); return; }
     if (editing) {
-      setBlocs(prev => prev.map(b => b.id === editing.id ? { ...b, ...form } : b));
-      toast({ title: "Bloc updated" });
+      put(route('projects.tranches.blocs.update', { project: project.id, tranche: tranche.id, bloc: editing.id }), {
+        onSuccess: () => {
+          setDialogOpen(false);
+          toast({ title: "Bloc updated successfully." });
+        },
+      });
     } else {
-      setBlocs(prev => [...prev, { ...form, id: crypto.randomUUID(), unitsCount: 0 }]);
-      toast({ title: "Bloc created" });
+      post(route('projects.tranches.blocs.store', { project: project.id, tranche: tranche.id }), {
+        onSuccess: () => {
+          setDialogOpen(false);
+          toast({ title: "Bloc created successfully." });
+        },
+      });
     }
-    setDialogOpen(false);
   };
 
   const handleDelete = () => {
-    if (deleting) { setBlocs(prev => prev.filter(b => b.id !== deleting.id)); toast({ title: "Bloc deleted" }); }
-    setDeleteOpen(false); setDeleting(null);
+    if (deleting) {
+      destroy(route('projects.tranches.blocs.destroy', { project: project.id, tranche: tranche.id, bloc: deleting.id }), {
+        onSuccess: () => {
+          setDeleteOpen(false);
+          setDeleting(null);
+          toast({ title: "Bloc deleted successfully." });
+        },
+      });
+    }
   };
 
   const handleBlocClick = (bloc: Bloc) => {
-    router.visit(`/management/${projectId}?${projectQuery}${companyQuery}${trancheQuery}&bloc=${bloc.id}&blocName=${encodeURIComponent(bloc.name)}`);
+    router.visit(route('blocs.management', bloc.id));
   };
 
   return (
@@ -105,7 +113,12 @@ const Blocs = () => {
           <header className="h-16 bg-card border-b border-border flex items-center justify-between px-6 sticky top-0 z-40">
             <div className="flex items-center gap-4">
               <SidebarTrigger className="lg:hidden" />
-              <AppBreadcrumb />
+              <AppBreadcrumb customItems={[
+                { title: "Companies", url: "/companies" },
+                { title: project.company?.name || "Company", url: `/projects?company=${project.company?.id || ''}&companyName=${encodeURIComponent(project.company?.name || '')}` },
+                { title: project.name, url: route('projects.tranches.index', project.id) },
+                { title: tranche.name, url: "" }
+              ]} />
             </div>
             <Button onClick={openCreate} className="gap-2" style={{ background: "hsl(var(--accent))", color: "hsl(var(--accent-foreground))" }}>
               <Plus className="w-4 h-4" /> Add Bloc
@@ -114,7 +127,7 @@ const Blocs = () => {
 
           <main className="flex-1 p-6 lg:p-8 max-w-[1400px] animate-in fade-in slide-in-from-bottom-1 duration-400">
             <div className="mb-8">
-              <h2 className="font-display text-[1.75rem] xl:text-[2rem] font-bold">{decodeURIComponent(trancheName)} — Blocs</h2>
+              <h2 className="font-display text-[1.75rem] xl:text-[2rem] font-bold">{tranche.name} — Blocs</h2>
               <p className="text-[0.9375rem] text-muted-foreground">Manage blocs in this tranche. Click a bloc to access project management.</p>
             </div>
 
@@ -145,7 +158,7 @@ const Blocs = () => {
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
                       <span className="font-semibold text-foreground">{bloc.floors} floors</span>
                       <span>·</span>
-                      <span>{bloc.unitsCount} units</span>
+                      <span>{bloc.properties_count || 0} units</span>
                     </div>
                   </div>
                   <div className="relative px-6 py-3 border-t border-border bg-muted/30 group-hover:bg-primary/10 flex items-center justify-between text-sm text-muted-foreground group-hover:text-foreground transition-colors duration-300 overflow-hidden">
@@ -189,20 +202,23 @@ const Blocs = () => {
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="bloc-name">Bloc Name *</Label>
-              <Input id="bloc-name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Bloc A1" />
+              <Input id="bloc-name" value={data.name} onChange={e => setData("name", e.target.value)} placeholder="e.g. Bloc A1" />
+              {errors.name && <div className="text-sm text-destructive">{errors.name}</div>}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="bloc-desc">Description</Label>
-              <Textarea id="bloc-desc" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Brief description" rows={3} />
+              <Textarea id="bloc-desc" value={data.description} onChange={e => setData("description", e.target.value)} placeholder="Brief description" rows={3} />
+              {errors.description && <div className="text-sm text-destructive">{errors.description}</div>}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="bloc-floors">Number of Floors</Label>
-              <Input id="bloc-floors" type="number" min={1} value={form.floors} onChange={e => setForm(f => ({ ...f, floors: parseInt(e.target.value) || 1 }))} />
+              <Input id="bloc-floors" type="number" min={1} value={data.floors} onChange={e => setData("floors", parseInt(e.target.value) || 1)} />
+              {errors.floors && <div className="text-sm text-destructive">{errors.floors}</div>}
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave} style={{ background: "hsl(var(--accent))", color: "hsl(var(--accent-foreground))" }}>{editing ? "Save Changes" : "Create Bloc"}</Button>
+            <Button onClick={handleSave} disabled={processing} style={{ background: "hsl(var(--accent))", color: "hsl(var(--accent-foreground))" }}>{editing ? "Save Changes" : "Create Bloc"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -211,16 +227,14 @@ const Blocs = () => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete "{deleting?.name}"?</AlertDialogTitle>
-            <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+            <AlertDialogDescription>This action cannot be undone. All units within this bloc will also be removed.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+            <AlertDialogAction onClick={handleDelete} disabled={processing} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </SidebarProvider>
   );
-};
-
-export default Blocs;
+}

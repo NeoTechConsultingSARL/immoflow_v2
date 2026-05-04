@@ -1,0 +1,32 @@
+@startuml
+left to right direction
+actor "Admin" as admin
+actor "Manager" as manager
+actor "User" as user
+
+package "Company & Project Management" {
+  usecase "Create Company" as UC1
+  usecase "Update Company" as UC2
+  usecase "Delete Company" as UC3
+  usecase "View Companies" as UC4
+  
+  usecase "Manage Projects" as UC5
+  usecase "Manage Tranches & Blocs" as UC6
+}
+
+admin --> UC1
+admin --> UC2
+admin --> UC3
+admin --> UC4
+admin --> UC5
+admin --> UC6
+
+manager --> UC1
+manager --> UC2
+manager --> UC3
+manager --> UC4
+manager --> UC5
+manager --> UC6
+
+user --> UC4
+@enduml

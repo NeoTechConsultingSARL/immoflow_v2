@@ -13,9 +13,36 @@ interface BreadcrumbEntry {
   href?: string;
 }
 
-export function AppBreadcrumb() {
+export function AppBreadcrumb({ customItems }: { customItems?: { title: string; url?: string }[] } = {}) {
   const { url } = usePage();
   const location = new URL(url || "/", window.location.origin);
+
+  if (customItems) {
+    return (
+      <Breadcrumb>
+        <BreadcrumbList>
+          {customItems.map((crumb, index) => {
+            const isLast = index === customItems.length - 1;
+            return (
+              <span key={index} className="inline-flex items-center gap-1.5 sm:gap-2.5">
+                {index > 0 && <BreadcrumbSeparator />}
+                <BreadcrumbItem>
+                  {isLast || !crumb.url ? (
+                    <BreadcrumbPage>{crumb.title}</BreadcrumbPage>
+                  ) : (
+                    <BreadcrumbLink asChild>
+                      <Link href={crumb.url}>{crumb.title}</Link>
+                    </BreadcrumbLink>
+                  )}
+                </BreadcrumbItem>
+              </span>
+            );
+          })}
+        </BreadcrumbList>
+      </Breadcrumb>
+    );
+  }
+
   const searchParams = location.searchParams;
   const path = location.pathname;
   const pathParts = path.split('/');
@@ -41,8 +68,8 @@ export function AppBreadcrumb() {
   const blocQuery = blocId ? `&bloc=${blocId}&blocName=${encodeURIComponent(blocName)}` : "";
   const companyQueryAmp = companyId ? `&company=${companyId}&companyName=${encodeURIComponent(companyName)}` : "";
 
-  const tranchesHref = `/tranches?${projectQuery}${companyQueryAmp}`;
-  const blocsHref = `/blocs?${projectQuery}${companyQueryAmp}${trancheQuery}`;
+  const tranchesHref = projectId ? `/projects/${projectId}/tranches` : `/tranches?${projectQuery}${companyQueryAmp}`;
+  const blocsHref = projectId ? `/projects/${projectId}/blocs?${trancheQuery.replace(/^&/, '')}` : `/blocs?${projectQuery}${companyQueryAmp}${trancheQuery}`;
   const pmHref = `/project-management?${projectQuery}${companyQueryAmp}${trancheQuery}${blocQuery}`;
 
   if (path === "/dashboard") {

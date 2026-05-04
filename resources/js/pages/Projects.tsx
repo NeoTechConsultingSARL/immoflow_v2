@@ -1,4 +1,4 @@
-import { router } from "@inertiajs/react";
+import { router, useForm, usePage } from "@inertiajs/react";
 import { useState } from "react";
 import { FolderKanban, Plus, Pencil, Trash2, Building2, MapPin, Calendar, Euro, LayoutGrid, FileText, ClipboardList, X } from "lucide-react";
 import { AppBreadcrumb } from "@/components/AppBreadcrumb";
@@ -15,44 +15,34 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 
-interface PropertyTypeAllocation {
-  propertyType: string;
-  units: number;
+interface PropertyType {
+  id: number;
+  name: string;
+}
+
+interface Company {
+  id: number;
+  name: string;
+}
+
+interface ProjectPropertyType {
+  property_type_id: number;
+  name: string;
+  quantity: number;
 }
 
 interface Project {
-  id: string;
+  id: number;
   name: string;
-  companyId: string;
-  companyName: string;
+  company_id: number;
+  company_name: string;
   address: string;
   description: string;
-  status: "Planning" | "In Progress" | "Completed" | "On Hold";
-  budget: string;
-  startDate: string;
-  units: number;
-  propertyAllocations: PropertyTypeAllocation[];
+  status: string;
+  budget: number;
+  start_date: string;
+  property_types: ProjectPropertyType[];
 }
-
-const propertyTypes = [
-  "Apartments", "Villas", "Offices", "Retail Spaces", "Warehouses", "Parking Lots", "Land Plots", "Other"
-];
-
-const companies = [
-  { id: "1", name: "Keller Immobilien GmbH" },
-  { id: "2", name: "BerlinWohnen AG" },
-  { id: "3", name: "Hanseatische Hausverwaltung" },
-  { id: "4", name: "Rhein-Main Properties" },
-];
-
-const initialProjects: Project[] = [
-  { id: "1", name: "Residenz am Englischen Garten", companyId: "1", companyName: "Keller Immobilien GmbH", address: "Lerchenfeldstraße 11, Munich", description: "Luxury residential complex with 24 units, underground parking, and rooftop terrace.", status: "In Progress", budget: "€12.5M", startDate: "Jan 2025", units: 24, propertyAllocations: [{ propertyType: "Apartments", units: 20 }, { propertyType: "Parking Lots", units: 4 }] },
-  { id: "2", name: "Spree Lofts", companyId: "2", companyName: "BerlinWohnen AG", address: "Köpenicker Str. 40, Berlin", description: "Industrial loft conversion into modern living spaces along the Spree river.", status: "Planning", budget: "€8.2M", startDate: "Apr 2026", units: 18, propertyAllocations: [{ propertyType: "Apartments", units: 18 }] },
-  { id: "3", name: "Alster Terrassen", companyId: "3", companyName: "Hanseatische Hausverwaltung", address: "An der Alster 28, Hamburg", description: "Waterfront apartments with panoramic views of the Alster lake.", status: "Completed", budget: "€15.0M", startDate: "Mar 2023", units: 36, propertyAllocations: [{ propertyType: "Apartments", units: 30 }, { propertyType: "Villas", units: 6 }] },
-  { id: "4", name: "Maintor Quartier", companyId: "4", companyName: "Rhein-Main Properties", address: "Mainzer Landstraße 78, Frankfurt", description: "Mixed-use development combining office and residential space in the financial district.", status: "In Progress", budget: "€22.0M", startDate: "Sep 2024", units: 42, propertyAllocations: [{ propertyType: "Offices", units: 20 }, { propertyType: "Apartments", units: 22 }] },
-  { id: "5", name: "Viktualien Höfe", companyId: "1", companyName: "Keller Immobilien GmbH", address: "Frauenstraße 9, Munich", description: "Boutique residential project near the Viktualienmarkt with traditional Bavarian charm.", status: "On Hold", budget: "€6.8M", startDate: "Jul 2025", units: 12, propertyAllocations: [{ propertyType: "Apartments", units: 12 }] },
-  { id: "6", name: "Prenzlauer Berg Studios", companyId: "2", companyName: "BerlinWohnen AG", address: "Schönhauser Allee 55, Berlin", description: "Compact studio apartments designed for young professionals and creatives.", status: "Planning", budget: "€4.1M", startDate: "Jun 2026", units: 30, propertyAllocations: [{ propertyType: "Apartments", units: 30 }] },
-];
 
 const statusStyles: Record<string, string> = {
   "Planning": "bg-blue-500/10 text-blue-600",
@@ -61,82 +51,104 @@ const statusStyles: Record<string, string> = {
   "On Hold": "bg-muted text-muted-foreground",
 };
 
-const emptyForm: { name: string; companyId: string; address: string; description: string; status: Project["status"]; budget: string; startDate: string; units: number; propertyAllocations: PropertyTypeAllocation[] } = { name: "", companyId: "", address: "", description: "", status: "Planning", budget: "", startDate: "", units: 0, propertyAllocations: [] };
-
-const Projects = () => {
-  const [projects, setProjects] = useState<Project[]>(initialProjects);
+const Projects = ({ projects = [], companies = [], propertyTypes = [] }: { projects: Project[], companies: Company[], propertyTypes: PropertyType[] }) => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editing, setEditing] = useState<Project | null>(null);
   const [deleting, setDeleting] = useState<Project | null>(null);
-  const [form, setForm] = useState(emptyForm);
   const searchParams = new URLSearchParams(window.location.search);
   const [filterCompany, setFilterCompany] = useState<string>(searchParams.get("company") || "all");
-  const companyName = searchParams.get("companyName") || "";
-  const companyId = searchParams.get("company") || "";
-  
 
-  const openCreate = () => { setEditing(null); setForm(emptyForm); setDialogOpen(true); };
+  const { data, setData, post, put, delete: destroy, processing, errors, reset, clearErrors } = useForm({
+    name: "",
+    company_id: "",
+    address: "",
+    description: "",
+    status: "Planning",
+    budget: "",
+    start_date: "",
+    property_types: [] as { property_type_id: string, quantity: number }[]
+  });
+
+  const openCreate = () => {
+    setEditing(null);
+    reset();
+    clearErrors();
+    setDialogOpen(true);
+  };
 
   const openEdit = (p: Project) => {
     setEditing(p);
-    setForm({ name: p.name, companyId: p.companyId, address: p.address, description: p.description, status: p.status, budget: p.budget, startDate: p.startDate, units: p.units, propertyAllocations: p.propertyAllocations || [] });
+    setData({
+      name: p.name,
+      company_id: p.company_id.toString(),
+      address: p.address || "",
+      description: p.description || "",
+      status: p.status || "Planning",
+      budget: p.budget?.toString() || "",
+      start_date: p.start_date || "",
+      property_types: p.property_types.map(pt => ({
+        property_type_id: pt.property_type_id.toString(),
+        quantity: pt.quantity
+      }))
+    });
+    clearErrors();
     setDialogOpen(true);
   };
 
   const openDelete = (p: Project) => { setDeleting(p); setDeleteOpen(true); };
 
   const handleSave = () => {
-    if (!form.name.trim() || !form.companyId) {
-      toast({ title: "Name and company are required", variant: "destructive" });
-      return;
-    }
-    const companyName = companies.find(c => c.id === form.companyId)?.name || "";
-    const totalUnits = form.propertyAllocations.reduce((sum, a) => sum + a.units, 0);
-    const saveData = { ...form, units: totalUnits };
     if (editing) {
-      setProjects(prev => prev.map(p => p.id === editing.id ? { ...p, ...saveData, companyName } : p));
-      toast({ title: "Project updated" });
+      put(route('projects.update', editing.id), {
+        onSuccess: () => {
+          setDialogOpen(false);
+          toast({ title: "Project updated successfully." });
+        },
+      });
     } else {
-      setProjects(prev => [...prev, { ...saveData, companyName, id: crypto.randomUUID() }]);
-      toast({ title: "Project created" });
+      post(route('projects.store'), {
+        onSuccess: () => {
+          setDialogOpen(false);
+          toast({ title: "Project created successfully." });
+        },
+      });
     }
-    setDialogOpen(false);
   };
 
   const handleDelete = () => {
-    if (deleting) { setProjects(prev => prev.filter(p => p.id !== deleting.id)); toast({ title: "Project deleted" }); }
-    setDeleteOpen(false); setDeleting(null);
+    if (deleting) {
+      destroy(route('projects.destroy', deleting.id), {
+        onSuccess: () => {
+          setDeleteOpen(false);
+          setDeleting(null);
+          toast({ title: "Project deleted successfully." });
+        },
+      });
+    }
   };
 
-  const updateField = (field: keyof typeof form, value: string | number | PropertyTypeAllocation[]) => setForm(prev => ({ ...prev, [field]: value }));
-
-  const usedPropertyTypes = form.propertyAllocations.map(a => a.propertyType);
-  const availablePropertyTypes = propertyTypes.filter(t => !usedPropertyTypes.includes(t));
+  const usedPropertyTypes = data.property_types.map(a => a.property_type_id);
+  const availablePropertyTypes = propertyTypes.filter(t => !usedPropertyTypes.includes(t.id.toString()));
 
   const addAllocation = () => {
     if (availablePropertyTypes.length === 0) return;
-    setForm(prev => ({
-      ...prev,
-      propertyAllocations: [...prev.propertyAllocations, { propertyType: "", units: 1 }]
-    }));
+    setData('property_types', [...data.property_types, { property_type_id: "", quantity: 1 }]);
   };
 
-  const updateAllocation = (index: number, field: keyof PropertyTypeAllocation, value: string | number) => {
-    setForm(prev => ({
-      ...prev,
-      propertyAllocations: prev.propertyAllocations.map((a, i) => i === index ? { ...a, [field]: value } : a)
-    }));
+  const updateAllocation = (index: number, field: 'property_type_id' | 'quantity', value: string | number) => {
+    const newAllocations = [...data.property_types];
+    newAllocations[index] = { ...newAllocations[index], [field]: value };
+    setData('property_types', newAllocations as any);
   };
 
   const removeAllocation = (index: number) => {
-    setForm(prev => ({
-      ...prev,
-      propertyAllocations: prev.propertyAllocations.filter((_, i) => i !== index)
-    }));
+    const newAllocations = [...data.property_types];
+    newAllocations.splice(index, 1);
+    setData('property_types', newAllocations);
   };
 
-  const filtered = filterCompany === "all" ? projects : projects.filter(p => p.companyId === filterCompany);
+  const filtered = filterCompany === "all" ? projects : projects.filter(p => p.company_id.toString() === filterCompany);
 
   return (
     <SidebarProvider>
@@ -165,28 +177,33 @@ const Projects = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Companies</SelectItem>
-                  {companies.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  {companies.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {filtered.map((project, index) => (
+              {filtered.map((project, index) => {
+                const totalUnits = project.property_types.reduce((sum, pt) => sum + pt.quantity, 0);
+                const formatter = new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
+                const budgetStr = project.budget ? formatter.format(project.budget) : '€0';
+                
+                return (
                 <div
                   key={project.id}
                   className="group bg-card border border-border rounded-xl shadow-[var(--shadow-card)] overflow-hidden hover:shadow-[var(--shadow-elevated)] transition-shadow duration-300 flex flex-col cursor-pointer"
-                  onClick={() => router.visit(`/tranches?project=${project.id}&name=${encodeURIComponent(project.name)}&company=${project.companyId}&companyName=${encodeURIComponent(project.companyName)}`)}
+                  onClick={() => router.visit(route('projects.tranches.index', project.id))}
                 >
                   <div className="p-6 flex-1">
                     <div className="flex items-start justify-between mb-3">
-                      <span className={cn("text-[0.6875rem] font-semibold px-2.5 py-1 rounded-full", statusStyles[project.status])}>
+                      <span className={cn("text-[0.6875rem] font-semibold px-2.5 py-1 rounded-full", statusStyles[project.status] || "bg-blue-500/10 text-blue-600")}>
                         {project.status}
                       </span>
                       <div className="flex items-center gap-1">
                         <TooltipProvider delayDuration={300}>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={(e) => { e.stopPropagation(); router.visit(`/tranches?project=${project.id}&name=${encodeURIComponent(project.name)}&company=${project.companyId}&companyName=${encodeURIComponent(project.companyName)}`); }}>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={(e) => { e.stopPropagation(); router.visit(route('projects.tranches.index', project.id)); }}>
                                 <LayoutGrid className="w-3.5 h-3.5" />
                               </Button>
                             </TooltipTrigger>
@@ -234,7 +251,7 @@ const Projects = () => {
                     <div className="space-y-2">
                       <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
                         <Building2 className="w-4 h-4 shrink-0" />
-                        <span className="truncate">{project.companyName}</span>
+                        <span className="truncate">{project.company_name}</span>
                       </div>
                       <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
                         <MapPin className="w-4 h-4 shrink-0" />
@@ -257,19 +274,19 @@ const Projects = () => {
                     />
                     <div className="flex items-center gap-1.5">
                       <Euro className="w-3.5 h-3.5 text-muted-foreground" />
-                      <span className="font-semibold">{project.budget}</span>
+                      <span className="font-semibold">{budgetStr}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-                      <span>{project.startDate}</span>
+                      <span>{project.start_date || 'N/A'}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <FolderKanban className="w-3.5 h-3.5 text-muted-foreground" />
-                      <span>{project.units} units</span>
+                      <span>{totalUnits} units</span>
                     </div>
                   </div>
                 </div>
-              ))}
+              )})}
             </div>
 
             {filtered.length === 0 && (
@@ -294,25 +311,28 @@ const Projects = () => {
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="name">Project Name *</Label>
-              <Input id="name" value={form.name} onChange={e => updateField("name", e.target.value)} placeholder="e.g. Residenz am Park" />
+              <Input id="name" value={data.name} onChange={e => setData("name", e.target.value)} placeholder="e.g. Residenz am Park" />
+              {errors.name && <div className="text-sm text-destructive">{errors.name}</div>}
             </div>
             <div className="grid gap-2">
               <Label>Company *</Label>
-              <Select value={form.companyId} onValueChange={v => updateField("companyId", v)}>
+              <Select value={data.company_id} onValueChange={v => setData("company_id", v)}>
                 <SelectTrigger><SelectValue placeholder="Select a company" /></SelectTrigger>
                 <SelectContent>
-                  {companies.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  {companies.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
+              {errors.company_id && <div className="text-sm text-destructive">{errors.company_id}</div>}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="desc">Description</Label>
-              <Textarea id="desc" value={form.description} onChange={e => updateField("description", e.target.value)} placeholder="Brief project description" rows={2} />
+              <Textarea id="desc" value={data.description} onChange={e => setData("description", e.target.value)} placeholder="Brief project description" rows={2} />
+              {errors.description && <div className="text-sm text-destructive">{errors.description}</div>}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Status</Label>
-                <Select value={form.status} onValueChange={v => updateField("status", v)}>
+                <Select value={data.status} onValueChange={v => setData("status", v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Planning">Planning</SelectItem>
@@ -321,46 +341,51 @@ const Projects = () => {
                     <SelectItem value="On Hold">On Hold</SelectItem>
                   </SelectContent>
                 </Select>
+                {errors.status && <div className="text-sm text-destructive">{errors.status}</div>}
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="budget">Budget</Label>
-                <Input id="budget" value={form.budget} onChange={e => updateField("budget", e.target.value)} placeholder="€10M" />
+                <Input id="budget" type="number" step="0.01" value={data.budget} onChange={e => setData("budget", e.target.value)} placeholder="10000000" />
+                {errors.budget && <div className="text-sm text-destructive">{errors.budget}</div>}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="address">Address</Label>
-                <Input id="address" value={form.address} onChange={e => updateField("address", e.target.value)} placeholder="Street, City" />
+                <Input id="address" value={data.address} onChange={e => setData("address", e.target.value)} placeholder="Street, City" />
+                {errors.address && <div className="text-sm text-destructive">{errors.address}</div>}
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="startDate">Start Date</Label>
-                <Input id="startDate" value={form.startDate} onChange={e => updateField("startDate", e.target.value)} placeholder="Jan 2026" />
+                <Input id="startDate" type="date" value={data.start_date} onChange={e => setData("start_date", e.target.value)} />
+                {errors.start_date && <div className="text-sm text-destructive">{errors.start_date}</div>}
               </div>
             </div>
             <div className="grid gap-3">
               <div className="flex items-center justify-between">
                 <Label>Property Types</Label>
-                {(availablePropertyTypes.length > 0 || form.propertyAllocations.some(a => !a.propertyType)) ? null : (
+                {(availablePropertyTypes.length > 0 || data.property_types.some(a => !a.property_type_id)) ? null : (
                   <span className="text-xs text-muted-foreground">All types assigned</span>
                 )}
               </div>
-              {form.propertyAllocations.map((allocation, index) => {
-                const otherUsed = form.propertyAllocations.filter((_, i) => i !== index).map(a => a.propertyType).filter(Boolean);
-                const optionsForThis = propertyTypes.filter(t => !otherUsed.includes(t));
+              {errors.property_types && <div className="text-sm text-destructive">{errors.property_types}</div>}
+              {data.property_types.map((allocation, index) => {
+                const otherUsed = data.property_types.filter((_, i) => i !== index).map(a => a.property_type_id).filter(Boolean);
+                const optionsForThis = propertyTypes.filter(t => !otherUsed.includes(t.id.toString()));
                 return (
                   <div key={index} className="flex items-center gap-2">
-                    <Select value={allocation.propertyType} onValueChange={v => updateAllocation(index, "propertyType", v)}>
+                    <Select value={allocation.property_type_id} onValueChange={v => updateAllocation(index, "property_type_id", v)}>
                       <SelectTrigger className="flex-1"><SelectValue placeholder="Select type" /></SelectTrigger>
                       <SelectContent>
-                        {optionsForThis.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                        {optionsForThis.map(t => <SelectItem key={t.id} value={t.id.toString()}>{t.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                     <Input
                       type="number"
                       min={1}
                       className="w-24"
-                      value={allocation.units}
-                      onChange={e => updateAllocation(index, "units", parseInt(e.target.value) || 0)}
+                      value={allocation.quantity}
+                      onChange={e => updateAllocation(index, "quantity", parseInt(e.target.value) || 0)}
                       placeholder="Units"
                     />
                     <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => removeAllocation(index)}>
@@ -369,7 +394,7 @@ const Projects = () => {
                   </div>
                 );
               })}
-              {(availablePropertyTypes.length > 0 || form.propertyAllocations.some(a => !a.propertyType)) && (
+              {(availablePropertyTypes.length > 0 || data.property_types.some(a => !a.property_type_id)) && (
                 <Button type="button" variant="outline" size="sm" className="gap-1.5 w-fit" onClick={addAllocation}>
                   <Plus className="w-3.5 h-3.5" /> Add Property Type
                 </Button>
@@ -378,7 +403,7 @@ const Projects = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave} style={{ background: "hsl(var(--accent))", color: "hsl(var(--accent-foreground))" }}>
+            <Button onClick={handleSave} disabled={processing} style={{ background: "hsl(var(--accent))", color: "hsl(var(--accent-foreground))" }}>
               {editing ? "Save Changes" : "Create Project"}
             </Button>
           </DialogFooter>
@@ -393,7 +418,7 @@ const Projects = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+            <AlertDialogAction onClick={handleDelete} disabled={processing} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

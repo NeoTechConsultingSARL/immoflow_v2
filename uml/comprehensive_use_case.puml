@@ -1,0 +1,60 @@
+@startuml
+left to right direction
+
+' Define Actors with Generalization
+actor "User" as user
+actor "Manager" as manager
+actor "Admin" as admin
+
+' Generalization relationships: Admin is a Manager, Manager is a User
+user <|-- manager
+manager <|-- admin
+
+package "ImmoFlow Ecosystem" {
+
+  ' User Use Cases
+  package "Authentication & Basic" {
+    usecase "Login / Logout" as UC_Auth
+    usecase "View Personal Profile" as UC_Profile
+  }
+
+  package "Property Viewing" {
+    usecase "View Properties" as UC_ViewProp
+  }
+
+  ' Manager Use Cases
+  package "Company & Project Management" {
+    usecase "Manage Companies" as UC_Company
+    usecase "Manage Projects" as UC_Project
+    usecase "Manage Tranches & Blocs" as UC_Tranche
+  }
+
+  package "Analytics" {
+    usecase "View Dashboard Metrics" as UC_Dashboard
+  }
+
+  ' Admin Use Cases
+  package "System Settings" {
+    usecase "Manage Users" as UC_Users
+    usecase "Manage Roles & Profiles" as UC_Roles
+    usecase "Manage Property Types" as UC_PropType
+  }
+}
+
+' Assign use cases to the lowest applicable role
+' Because of generalization, managers and admins inherit these automatically
+
+user --> UC_Auth
+user --> UC_Profile
+user --> UC_ViewProp
+
+manager --> UC_Company
+manager --> UC_Project
+manager --> UC_Tranche
+manager --> UC_Dashboard
+
+admin --> UC_Users
+admin --> UC_Roles
+admin --> UC_PropType
+
+@enduml

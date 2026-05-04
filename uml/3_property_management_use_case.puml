@@ -1,0 +1,32 @@
+@startuml
+left to right direction
+actor "Admin" as admin
+actor "Manager" as manager
+actor "User" as user
+
+package "Property Management" {
+  usecase "View Properties" as UC1
+  usecase "Create Property" as UC2
+  usecase "Update Property" as UC3
+  usecase "Delete Property" as UC4
+  
+  usecase "Assign Client to Property" as UC5
+  usecase "Manage Work Orders" as UC6
+}
+
+admin --> UC1
+admin --> UC2
+admin --> UC3
+admin --> UC4
+admin --> UC5
+admin --> UC6
+
+manager --> UC1
+manager --> UC2
+manager --> UC3
+manager --> UC4
+manager --> UC5
+manager --> UC6
+
+user --> UC1
+@enduml
