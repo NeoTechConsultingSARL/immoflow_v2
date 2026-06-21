@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Controllers\BlocController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\TrancheController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -50,17 +52,26 @@ Route::middleware('auth')->group(function () {
         return Inertia::render('ProjectManagement');
     })->name('management')->middleware('role:admin,manager');
 
-    Route::get('/tranches', function () {
-        return Inertia::render('Tranches');
-    })->name('tranches')->middleware('role:admin,manager');
+    Route::get('/tranches', [TrancheController::class, 'index'])
+        ->name('tranches')->middleware('role:admin,manager');
+    Route::post('/tranches', [TrancheController::class, 'store'])
+        ->name('tranches.store')->middleware('role:admin,manager');
+    Route::put('/tranches/{tranche}', [TrancheController::class, 'update'])
+        ->name('tranches.update')->middleware('role:admin,manager');
+    Route::delete('/tranches/{tranche}', [TrancheController::class, 'destroy'])
+        ->name('tranches.destroy')->middleware('role:admin,manager');
 
-    Route::get('/projects/{project}/blocs', function () {
-        return Inertia::render('Blocs');
-    })->name('projects.blocs')->middleware('role:admin,manager');
+    Route::get('/projects/{project}/blocs', [BlocController::class, 'index'])
+        ->name('projects.blocs')->middleware('role:admin,manager');
 
-    Route::get('/blocs', function () {
-        return Inertia::render('Blocs');
-    })->name('blocs')->middleware('role:admin,manager');
+    Route::get('/blocs', [BlocController::class, 'index'])
+        ->name('blocs')->middleware('role:admin,manager');
+    Route::post('/blocs', [BlocController::class, 'store'])
+        ->name('blocs.store')->middleware('role:admin,manager');
+    Route::put('/blocs/{bloc}', [BlocController::class, 'update'])
+        ->name('blocs.update')->middleware('role:admin,manager');
+    Route::delete('/blocs/{bloc}', [BlocController::class, 'destroy'])
+        ->name('blocs.destroy')->middleware('role:admin,manager');
 
     Route::get('/property-types', function () {
         return Inertia::render('PropertyTypes');
